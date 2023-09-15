@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>식단 리스트</title>
+</head>
+<body>
+    <h2>식단 리스트</h2>
+    <div id="menuList">
+        
+    </div>
+    
+    <h2>식단 점수 차트</h2>
+
+    <div id="chart_div" style="width: 900px; height: 500px">
+
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-latest.min.js"></script>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script>
+    let days = ['월', '화', '수', '목', '금' ];
+    let arr= [];
+    let scoreList = [];
+    let sc2 = [];
+    let menuList = [];
+    
+    // 서버에서 데이터를 가져오는 AJAX 요청
+    $.ajax({
+        url: "/getList", 
+        success: function(data) {
+            for( i = 0 ; i < data.length; i++){
+                let menus = data[i];
+                menuList[i] = data[i];
+                let str = `<span id="data${i}">${days[i]}<br>`;
+                     
+                for( j = 0 ; j < menus.length; j++){
+                    console.log(menus[j]);
+                    str = str + `${menus[j]} <select id = 'score${i}_${j}'>`;
+                    for( q = 0; q < 11; q++){
+                        str = str + `<option value = ${q}>${q}</option>`
+                    }
+                    str = str + `</select><br>`;
+                }
+                arr.push(menus.length);
+                str = str + `</span><br>`;
+                $('#menuList').append(str);
+            }
+            $('#menuList').append(`<input type="button" value="차트 불러오기" onclick="getChart()">`)   
+            $('#menuList').append(`&nbsp<input type="button" value="엑셀파일 저장하기" onclick="sendDataToServer()">`)
+            
+        },
+        error: function(error) {
+            console.error("데이터를 가져오는 데 실패했습니다.", error);
+        }
+    });
+
+    google.charts.load('current', {packages: ['corechart', 'line']});
+    function getChart() {
+        google.charts.setOnLoadCallback(drawCurveTypes);
+
+        function drawCurveTypes(chartname) {
+            let name = chartname;
+            var datas = new google.visualization.DataTable();
+            datas.addColumn('string', 'X');
+            datas.addColumn('number', '만족도');
+
+            for( i = 0; i < arr.length; i++){
+                let nums = 0;
+                for(j = 0; j < arr[i]; j++){
+                    let selected = document.getElementById('score'+i+'_'+j);
+                    let number = parseInt(selected.options[selected.selectedIndex].value);
+                    sc2.push(number);
+                    scoreList[j] = number;
+                    nums += number;
+                }
+                let score = nums / arr[i];
+                console.log(score);
+                datas.addRows([
+                    [days[i], score]
+                ]);
+            }
+
+            var options = {
+                hAxis: {
+                    title: 'Day'
+                },
+                vAxis: {
+                    title: '만족도'
+                }
+
+            };
+
+            var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+            chart.draw(datas, options);
+        }
+
+    } 
+    
+    function sendDataToServer() {
+
+        // 데이터를 하나의 객체로 묶어서 전송
+        var dataToSend = {
+            scoreList: sc2,
+            menu: menuList,
+            days: days,
+        };
+    
+        $.ajax({
+            type: "POST",
+            url: "/excelFile", // 서버의 엔드포인트 URL
+            data: JSON.stringify(dataToSend), // 데이터를 JSON 문자열로 변환하여 보냄
+            contentType: "application/json; charset=utf-8", // 데이터 형식 지정
+            success: function (response) {
+                // 서버 응답 성공 시 실행되는 코드
+                console.log("서버 응답:", response);
+            },
+            error: function (error) {
+                // 서버 요청 실패 시 실행되는 코드
+                console.log("서버 요청 실패:", error);
+            }
+        });
+    }
+    
+</script>
+</html>
